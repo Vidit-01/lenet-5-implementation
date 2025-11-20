@@ -7,7 +7,7 @@ class Sequence:
     def forward(self, X):
         out = X
         for layer in self.layers:
-            out = layer(out)
+            out = layer.forward(out)
         self.out = out
         return out
 
