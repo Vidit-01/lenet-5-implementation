@@ -57,5 +57,7 @@ If you use this implementation, please cite the original work:
 
 > Yann LeCun, Léon Bottou, Yoshua Bengio, and Patrick Haffner.  
 > *Gradient-Based Learning Applied to Document Recognition.*  
-> Proceedings of the IEEE, 1998.
+> Proceedings of the IEEE, 1998.  
+> [PDF Link](http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf)
+
 
