@@ -6,26 +6,27 @@ class Conv2D_Mapped:
         self.out_ch = out_channels
         self.k = kernel_size
         self.mapping = mapping            # custom connection table
-
+        self.params = {}
+        self.grads = {}
         # Create weight only for mapped connections
-        self.W = {}
+        self.params['W'] = {}
         for oc in range(out_channels):
-            self.W[oc] = {}
+            self.params['W'][oc] = {}
             for ic in mapping[oc]:
                 limit = np.sqrt(1 / (kernel_size * kernel_size))
-                self.W[oc][ic] = np.random.uniform(
+                self.params['W'][oc][ic] = np.random.uniform(
                     -limit, limit,
                     (kernel_size, kernel_size)
                 )
 
         # Bias for each output channel
-        self.b = np.zeros((out_channels, 1))
+        self.params['b'] = np.zeros((out_channels, 1))
 
         # grads
-        self.dW = {oc: {ic: np.zeros((kernel_size, kernel_size))
+        self.grads['W'] = {oc: {ic: np.zeros((kernel_size, kernel_size))
                         for ic in mapping[oc]}
                    for oc in range(out_channels)}
-        self.db = np.zeros((out_channels, 1))
+        self.grads['b'] = np.zeros((out_channels, 1))
 
     def forward(self, X):
         self.X = X
@@ -44,9 +45,9 @@ class Conv2D_Mapped:
                     for i in range(out_h):
                         for j in range(out_w):
                             region = X[b, ic, i:i+k, j:j+k]
-                            out[b, oc, i, j] += np.sum(region * self.W[oc][ic])
+                            out[b, oc, i, j] += np.sum(region * self.params['W'][oc][ic])
 
-                out[b, oc] += self.b[oc]
+                out[b, oc] += self.params['b'][oc]
 
         return out
 
@@ -63,14 +64,14 @@ class Conv2D_Mapped:
         # Reset grads
         for oc in range(self.out_ch):
             for ic in self.mapping[oc]:
-                self.dW[oc][ic].fill(0)
-        self.db.fill(0)
+                self.grads['W'][oc][ic].fill(0)
+        self.grads['b'].fill(0)
 
         for b in range(B):
             for oc in range(self.out_ch):
 
                 # db
-                self.db[oc] += np.sum(d_out[b, oc])
+                self.grads['b'][oc] += np.sum(d_out[b, oc])
 
                 for ic in self.mapping[oc]:
 
@@ -79,10 +80,10 @@ class Conv2D_Mapped:
                             region = X[b, ic, i:i+k, j:j+k]
 
                             # dW
-                            self.dW[oc][ic] += d_out[b, oc, i, j] * region
+                            self.grads['W'][oc][ic] += d_out[b, oc, i, j] * region
 
                             # dX
                             dX[b, ic, i:i+k, j:j+k] += \
-                                d_out[b, oc, i, j] * self.W[oc][ic]
+                                d_out[b, oc, i, j] * self.params['W'][oc][ic]
 
         return dX

@@ -12,25 +12,13 @@ class Sequence:
         return out
 
     def backward(self, y):
-        """
-        y: labels (for loss)
-        """
-        # compute loss
         loss = self.loss_fn.forward(self.out, y)
-
-        # gradient wrt logits
         grad = self.loss_fn.backward()
-
-        # backprop through layers
         for layer in reversed(self.layers):
             grad = layer.backward(grad)
-
         return loss
 
     def step(self):
-        """
-        Applies optimizer to all layers with params
-        """
         if self.optimizer is None:
             return
 

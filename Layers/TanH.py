@@ -9,5 +9,4 @@ class Tanh:
         return self.out
 
     def backward(self, d_out):
-        # derivative = 1 - tanh^2(x)
         return d_out * (1 - self.out ** 2)

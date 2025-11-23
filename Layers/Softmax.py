@@ -6,14 +6,12 @@ class Softmax:
 
     def forward(self, X):
         self.X = X
-        # stable softmax
         shifted = X - np.max(X, axis=1, keepdims=True)
         exp = np.exp(shifted)
         self.out = exp / np.sum(exp, axis=1, keepdims=True)
         return self.out
 
-    def backward(self, d_out):
-        # general softmax backward: batch-wise Jacobian
+    def backward(self, d_out,*args):
         B, C = d_out.shape
         dX = np.zeros_like(d_out)
 

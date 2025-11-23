@@ -1,65 +1,100 @@
 import numpy as np
 
+
+def im2col(X, k):
+    B, C, H, W = X.shape
+    out_h = H - k + 1
+    out_w = W - k + 1
+
+    i0 = np.repeat(np.arange(k), k)
+    i0 = np.tile(i0, C)
+    i1 = np.repeat(np.arange(out_h), out_w)
+    j0 = np.tile(np.arange(k), k * C)
+    j1 = np.tile(np.arange(out_w), out_h)
+
+    i = i0.reshape(-1,1) + i1.reshape(1,-1)
+    j = j0.reshape(-1,1) + j1.reshape(1,-1)
+
+    c = np.repeat(np.arange(C), k*k).reshape(-1,1)
+
+    cols = X[:, c, i, j]
+    return cols
+
+def col2im(cols, X_shape, k):
+    B, C, H, W = X_shape
+    out_h = H - k + 1
+    out_w = W - k + 1
+
+    X_grad = np.zeros((B, C, H, W))
+
+    i0 = np.repeat(np.arange(k), k)
+    i0 = np.tile(i0, C)
+    i1 = np.repeat(np.arange(out_h), out_w)
+    j0 = np.tile(np.arange(k), k * C)
+    j1 = np.tile(np.arange(out_w), out_h)
+
+    i = i0.reshape(-1,1) + i1.reshape(1,-1)
+    j = j0.reshape(-1,1) + j1.reshape(1,-1)
+    c = np.repeat(np.arange(C), k*k).reshape(-1,1)
+
+    np.add.at(X_grad, (slice(None), c, i, j), cols.reshape(B, -1, out_h*out_w))
+
+    return X_grad
+
+
+
+
 class Conv2D:
     def __init__(self, in_channels, out_channels, kernel_size):
         self.in_ch = in_channels
         self.out_ch = out_channels
         self.k = kernel_size
 
-        # Xavier init
         limit = np.sqrt(1 / (in_channels * kernel_size * kernel_size))
-        self.W = np.random.uniform(-limit, limit, 
-                    (out_channels, in_channels, kernel_size, kernel_size))
-        self.b = np.zeros((out_channels, 1))
-
-        self.dW = np.zeros_like(self.W)
-        self.db = np.zeros_like(self.b)
+        self.params = {
+            "W": np.random.uniform(-limit, limit,
+                (out_channels, in_channels, kernel_size, kernel_size)),
+            "b": np.zeros(out_channels)
+        }
+        self.grads = {
+            "W": np.zeros_like(self.params["W"]),
+            "b": np.zeros_like(self.params["b"])
+        }
 
     def forward(self, X):
-        # X: (B, C, H, W)
+        X = np.ascontiguousarray(X)
         self.X = X
         B, C, H, W = X.shape
         k = self.k
+        self.out_h = H - k + 1
+        self.out_w = W - k + 1
 
-        out_h = H - k + 1
-        out_w = W - k + 1
+        self.X_col = im2col(X, k)               
+        self.X_col = self.X_col.transpose(0, 2, 1)  
+        W_col = self.params['W'].reshape(self.out_ch, -1)
 
-        out = np.zeros((B, self.out_ch, out_h, out_w))
+        out = self.X_col @ W_col.T
+        out = out.transpose(0,2,1).reshape(B, self.out_ch, self.out_h, self.out_w)
 
-        for b in range(B):
-            for oc in range(self.out_ch):
-                for ic in range(self.in_ch):
-                    for i in range(out_h):
-                        for j in range(out_w):
-                            region = X[b, ic, i:i+k, j:j+k]
-                            out[b, oc, i, j] += np.sum(region * self.W[oc, ic])
-                out[b, oc] += self.b[oc]
 
         return out
 
-    def backward(self, d_out):
-        X = self.X
-        B, C, H, W = X.shape
+    def backward(self, dout):
+        X = np.ascontiguousarray(self.X)
+        B = dout.shape[0]
         k = self.k
+        C_out = self.out_ch
 
-        out_h = H - k + 1
-        out_w = W - k + 1
+        dout_flat = dout.reshape(B, C_out, -1).transpose(0,2,1)
 
-        self.dW = np.zeros_like(self.W)
-        self.db = np.zeros_like(self.b)
-        dX = np.zeros_like(X)
+        dW_col = dout_flat.transpose(0,2,1) @ self.X_col 
+        self.grads["W"] = dW_col.sum(axis=0).reshape(self.params["W"].shape)
 
-        for b in range(B):
-            for oc in range(self.out_ch):
-                for ic in range(self.in_ch):
+        self.grads["b"] = dout.sum(axis=(0,2,3))
 
-                    for i in range(out_h):
-                        for j in range(out_w):
-                            region = X[b, ic, i:i+k, j:j+k]
+        W_col = self.params["W"].reshape(C_out, -1)
+        dX_col = dout_flat @ W_col 
+        dX_col = dX_col.transpose(0,2,1)
 
-                            self.dW[oc, ic] += d_out[b, oc, i, j] * region
-                            dX[b, ic, i:i+k, j:j+k] += d_out[b, oc, i, j] * self.W[oc, ic]
-
-                self.db[oc] += np.sum(d_out[b, oc])
-
+        dX = col2im(dX_col, self.X.shape, k)
         return dX

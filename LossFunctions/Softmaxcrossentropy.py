@@ -7,13 +7,9 @@ class SoftmaxCrossEntropy:
     def forward(self, logits, y_true):
         self.logits = logits
         B, C = logits.shape
-
-        # stable softmax
         shifted = logits - np.max(logits, axis=1, keepdims=True)
         exp = np.exp(shifted)
         self.probs = exp / np.sum(exp, axis=1, keepdims=True)
-
-        # cross entropy loss
         log_likelihood = -np.log(self.probs[np.arange(B), y_true] + 1e-12)
         loss = np.mean(log_likelihood)
         self.y_true = y_true
