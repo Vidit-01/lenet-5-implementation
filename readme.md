@@ -17,7 +17,7 @@ The architecture of original model is shown below
 Some Changes are made in this implementation according to convinence 
 
 1. **Pooling Layers**  
-   - Replaced average pooling (subsampling) with max pooling.
+   - Replaced subsampling with paramerters with avgerage pooling.
 
 1. **Output Layer**  
    - Replaced the original RBF/Gaussian output units with a `Softmax` layer.
